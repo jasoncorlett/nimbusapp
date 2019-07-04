@@ -186,25 +186,30 @@ if [[ "${IMAGE}" = *"version"* ]]; then
   exit 0
 fi
 
-if [[ "$IMAGE" == *\/* ]]; then
-  REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
-  IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
-fi
 
-if [[ "$IMAGE" == *:* ]]; then
-  VERSION=$(echo $IMAGE | cut -d':' -f2 )
-  IMAGE=$(echo $IMAGE | cut -d':' -f1 )
-elif [[ -e $ENV_FILE ]]; then
-  product_exists
-  prodExists=$?
-  if [[ $prodExists -eq 0 ]]; then
-    #ensuring uniform comparision since someone could pass intillij or intellij.dockerapp
-    IMAGE=$(echo $IMAGE | cut -d'.' -f1 )".dockerapp"
-    VERSION=$(grep "^${IMAGE}" ${ENV_FILE} | cut -d':' -f2 )
-    output "Using ${IMAGE}:${VERSION} version found in ${ENV_FILE}"
-  else
-    output "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
-  fi
+if [[ -f "${IMAGE}" ]]; then
+    REPOSITORY="local"
+    VERSION="local"
+else
+    if [[ "$IMAGE" == *\/* ]]; then
+        REPOSITORY=$(echo $IMAGE | cut -d'/' -f1 )
+        IMAGE=$(echo $IMAGE | cut -d'/' -f2 )
+    fi
+    if [[ "$IMAGE" == *:* ]]; then
+      VERSION=$(echo $IMAGE | cut -d':' -f2 )
+      IMAGE=$(echo $IMAGE | cut -d':' -f1 )
+    elif [[ -e $ENV_FILE ]]; then
+      product_exists
+      prodExists=$?
+      if [[ $prodExists -eq 0 ]]; then
+        #ensuring uniform comparision since someone could pass intillij or intellij.dockerapp
+        IMAGE=$(echo $IMAGE | cut -d'.' -f1 )".dockerapp"
+        VERSION=$(grep "^${IMAGE}" ${ENV_FILE} | cut -d':' -f2 )
+        output "Using ${IMAGE}:${VERSION} version found in ${ENV_FILE}"
+      else
+        output "Not able to find ${IMAGE} in ${ENV_FILE}.  Will attempt to start using ${IMAGE}:${VERSION}"
+      fi
+    fi
 fi
 
 # IMAGE="admpresales/${IMAGE}.dockerapp"
@@ -304,14 +309,20 @@ if [[ -z ${PROJECT} ]]; then
 fi
 
 COMPOSE_ARGS="$@"
-COMPOSE_DIR="${NIMBUS_BASEDIR}/cache/${PROJECT}/${REPOSITORY}/${IMAGE}/${VERSION}"
-COMPOSE_FILE="${COMPOSE_DIR}/${IMAGE}.yml"
+COMPOSE_DIR="${NIMBUS_BASEDIR}/cache/${PROJECT}/${REPOSITORY}/$(basename "${IMAGE}")/${VERSION}"
+COMPOSE_FILE="${COMPOSE_DIR}/$(basename "${IMAGE}").yml"
 COMPOSE_BACKUP="${COMPOSE_FILE}.bk"
 
 
 if [[ -n "${DOCKERAPP_ACTION}" ]]; then
    if curl -s --connect-timeout "${NIMBUS_DOCKERHUB_TIMEOUT}" "${NIMBUS_DOCKERHUB_URL}" > /dev/null 2>&1; then
-       DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS} ${REPOSITORY}/${IMAGE}:${VERSION}"
+       DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${DOCKERAPP_ACTION} ${DOCKERAPP_ARGS}"
+       
+       if [[ -f "${IMAGE}" ]]; then
+           DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${IMAGE}"
+       else
+           DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} ${REPOSITORY}/${IMAGE}:${VERSION}"
+       fi
 
        if [[ "$DOCKERAPP_ACTION" == "render" ]]; then
           DOCKERAPP_COMMAND="${DOCKERAPP_COMMAND} > ${COMPOSE_FILE}"
