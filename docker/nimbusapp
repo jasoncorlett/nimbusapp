@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# Debug mode, easy to get a shell without changing the entrypoint
+if [[ "$1" == "sh" ]]; then 
+    shift
+    exec bash "$@"
+    echo "Couldn't launch bash  (exit: $?)" >&2
+    exit 1
+fi
+
+# TODO: How should we handle docker hub?
+docker login
+
 function usage()
 {
     output "Usage: nimbusapp <IMAGE>:<VERSION> [OPTIONS] COMMAND"
